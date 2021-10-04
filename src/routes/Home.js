@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { dbService } from "fBase";
+import { dbService, storageService } from "fBase";
 import { addDoc, collection, getDocs, onSnapshot, query, orderBy } from "firebase/firestore";
 import Sweet from "../components/Sweet";
+import { v4 as uuidv4 } from "uuid";
+import { getDownloadURL, uploadBytes, uploadString, ref } from "firebase/storage";
+
 
 const Home = ({ userObj }) => {
     const [sweet, setSweet] = useState("");
@@ -20,6 +23,36 @@ const Home = ({ userObj }) => {
     }, []);
     const onSubmit = async (event) => {
         event.preventDefault();
+        let attachmentUrl = "";
+        try {
+            if (attachment !== "") {
+                const attachmentRef = ref(storageService, `${userObj.uid}/${uuidv4()}`);
+                const uploadFile = await uploadString(attachmentRef, attachment, "data_url");
+                console.log(uploadFile);
+                attachmentUrl = await getDownloadURL(uploadFile.ref);
+            }
+        } catch (e) {
+            console.log("Error: " + e);
+        }
+        
+        try {
+            const docRef = await addDoc(collection(dbService, "sweets"), {
+                text: sweet,
+                createdAt: Date.now(),
+                creatorId: userObj.uid,
+                attachmentUrl
+            });
+
+            console.log("Document written with ID: ", docRef.id);
+        } catch (error) {
+            console.log("Error adding document: ", error);
+        }
+
+        setSweet("");
+        setAttachment("");
+    };
+    /*const onSubmit = async (event) => {
+        event.preventDefault();
 
         try {
             const docRef = await addDoc(collection(dbService, "sweets"), {
@@ -34,7 +67,7 @@ const Home = ({ userObj }) => {
         }
 
         setSweet("");
-    };
+    }; */
     /*const onSubmit = async (event) => {
         event.preventDefault();
 
@@ -59,6 +92,7 @@ const Home = ({ userObj }) => {
         setSweet("");
         setAttachment("");
     };*/
+
     const onChange = (event) => {
         const {
             target: { value },
@@ -72,7 +106,7 @@ const Home = ({ userObj }) => {
         const theFile = files[0];
         const reader = new FileReader();
         reader.onloadend = (finishedEvent) => {
-            const {currentTarget: { result },} = finishedEvent;
+            const {currentTarget: { result }} = finishedEvent;
             setAttachment(result)
         };
         reader.readAsDataURL(theFile);
